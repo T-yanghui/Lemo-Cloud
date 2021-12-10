@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mvc="http://www.springframework.org/schema/mvc"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd
+          http://www.springframework.org/schema/mvc
+       http://www.springframework.org/schema/mvc/spring-mvc.xsd http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 配置扫描的包 -->
+    <context:component-scan base-package="top.**" />
+<!--	elfinder-->
+	<context:component-scan base-package="org.grapheco.elfinder.controller" />
+    <!-- 注册HandlerMapper、HandlerAdapter两个映射类 -->
+    <mvc:annotation-driven />
+
+    <!-- 访问静态资源 -->
+    <mvc:default-servlet-handler />
+
+	<!-- 配置拦截器 -->
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<!-- 配置拦截器作用的路径 -->
+			<mvc:mapping path="/**" />
+			<bean class="top.interceptor.mainInterceptor" />
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+    <!-- 视图解析器 -->
+    <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="prefix" value="/WEB-INF/view/"></property>
+        <property name="suffix" value=".jsp"></property>
+    </bean>
+	<!-- 加载邮箱配置文件 -->
+	<context:property-placeholder location="classpath:mail.properties" />
+	<bean id="SimpleMailMessage" class="org.springframework.mail.SimpleMailMessage">
+		<property name="from">
+			<value>${mail.from}</value>
+		</property>
+		<!-- 查看SimpleMailMessage源码还可以注入标题,内容等 -->
+	</bean>
+	<!-- 声明JavaMailSenderImpl对象 -->
+	<bean id="JavaMailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="defaultEncoding" value="UTF-8" />
+		<property name="host" value="${mail.host}" />
+		<property name="username" value="${mail.username}" />
+		<property name="password" value="${mail.password}" />
+		<property name="javaMailProperties">
+			<props>
+				<!-- 设置认证开关 -->
+				<prop key="mail.smtp.auth">true</prop>
+				<!-- 启动调试开关 -->
+				<prop key="mail.debug">true</prop>
+				<!-- 设置发送延时 -->
+				<prop key="mail.smtp.timeout">0</prop>
+			</props>
+		</property>
+	</bean>
+
+
+<!--	配置数据库-->
+<!--	mybatis-->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	<bean id="userMapper" class="org.mybatis.spring.mapper.MapperFactoryBean">
+		<property name="mapperInterface" value="top.mapper.userMapper" />
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	</bean>
+	<bean id="userDao" class="top.dao.UserDaoImpl">
+		<property name="userMapper" ref="userMapper" />
+	</bean>
+<!--mybatis	end-->
+  <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+    <property name="driverClass" value = "com.mysql.jdbc.Driver" />
+    <property name="jdbcUrl" value = "jdbc:mysql://192.168.4.1:3306/webfile" />
+    <property name="user" value = "root" />
+    <property name="password" value = "Bupt607545!" />
+    <property name="initialPoolSize" value = "5" />
+  </bean>
+<!--elfinder-->
+<!--    	<bean-->
+<!--		class="org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter" />-->
+
+	<!-- find appropriate command executor for given command -->
+	<bean id="commandExecutorFactory"
+		class="org.grapheco.elfinder.controller.executor.DefaultCommandExecutorFactory">
+		<property name="classNamePattern"
+			value="org.grapheco.elfinder.controller.executors.%sCommandExecutor" />
+		<property name="fallbackCommand">
+			<bean
+				class="org.grapheco.elfinder.controller.executors.MissingCommandExecutor" />
+		</property>
+		<property name="map">
+			<map>
+				<!--
+				<entry key="tree">
+					<bean class="cn.bluejoe.elfinder.controller.executors.TreeCommandExecutor" />
+				</entry>
+				-->
+			</map>
+		</property>
+	</bean>
+
+<!--	FsService scope session-->
+	<bean id="FsService" class="org.grapheco.elfinder.impl.DefaultFsService" scope="session">
+		<aop:scoped-proxy />
+		<property name="serviceConfig">
+			<bean class="org.grapheco.elfinder.impl.DefaultFsServiceConfig">
+				<property name="tmbWidth" value="80" />
+			</bean>
+		</property>
+
+		<property name="securityChecker">
+			<bean class="org.grapheco.elfinder.impl.FsSecurityCheckerChain">
+				<property name="filterMappings">
+					<list>
+						<bean class="org.grapheco.elfinder.impl.FsSecurityCheckFilterMapping">
+							<property name="pattern" value="A_.*" />
+							<property name="checker">
+								<bean class="org.grapheco.elfinder.impl.FsSecurityCheckForAll">
+									<property name="readable" value="true" />
+									<property name="writable" value="true" />
+								</bean>
+							</property>
+						</bean>
+						<bean class="org.grapheco.elfinder.impl.FsSecurityCheckFilterMapping">
+							<property name="pattern" value="B_.*" />
+							<property name="checker">
+								<bean class="org.grapheco.elfinder.impl.FsSecurityCheckForAll">
+									<property name="readable" value="true" />
+									<property name="writable" value="false" />
+								</bean>
+							</property>
+						</bean>
+					</list>
+				</property>
+			</bean>
+		</property>
+	</bean>
+
+
+	<!-- FsService is often retrieved from HttpRequest -->
+	<!-- while a static FsService is defined here -->
+<bean id="fsServiceFactory" class="org.grapheco.elfinder.impl.DynamicFsServiceFactory">
+	</bean>
+</beans>
